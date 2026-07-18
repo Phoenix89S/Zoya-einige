@@ -1305,3 +1305,106 @@ if __name__ == "__main__":
     print("="*60)
 
     sys.exit(app.exec())
+
+# =========================
+# Дополнительные улучшения и финальные методы
+# =========================
+
+class MainWindow(QMainWindow):
+    def closeEvent(self, event):
+        modified_tabs = [tab for tab in self.tabs.values() if tab.modified]
+        if modified_tabs:
+            reply = QMessageBox.question(
+                self, "Выход из Зои",
+                f"Есть {len(modified_tabs)} несохранённых плейлистов.\nСохранить перед выходом?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel
+            )
+            if reply == QMessageBox.StandardButton.Cancel:
+                event.ignore()
+                return
+            elif reply == QMessageBox.StandardButton.Yes:
+                for tab in modified_tabs:
+                    tab.save_to_file()
+        event.accept()
+
+
+# =========================
+# Полный запуск
+# =========================
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    
+    # Настройки
+    app.setApplicationName("Зоя")
+    app.setApplicationVersion("8.0")
+    app.setOrganizationName("Zoya Project")
+    app.setStyle('Fusion')  # современный вид
+    
+    # Главное окно
+    window = MainWindow()
+    window.show()
+    
+    print("=" * 70)
+    print("🚀 ЗОЯ CANON ENGINE 8.0 УСПЕШНО ЗАПУЩЕНА")
+    print("Горячие клавиши:")
+    print("   Ctrl+N     — Новый плейлист")
+    print("   Ctrl+O     — Открыть файл")
+    print("   Ctrl+S     — Сохранить")
+    print("   Ctrl+Shift+Z — Применить все каноны")
+    print("=" * 70)
+    
+    sys.exit(app.exec())
+
+# =====================================================
+# ФИНАЛЬНЫЕ ПРАВКИ И ЗАПУСК
+# =====================================================
+
+# Добавь в конец файла (после всех классов)
+
+    # Метод для быстрого применения канонов из меню
+    def _apply_zoya_canons(self):
+        if not self.current_tab:
+            QMessageBox.warning(self, "Зоя", "Нет открытого плейлиста")
+            return
+        self.current_tab.apply_zoya_canons()
+
+    # Метод сохранения всех вкладок
+    def _save_all(self):
+        saved = 0
+        for tab in self.tabs.values():
+            if tab.modified and tab.filepath:
+                if tab.save_to_file():
+                    saved += 1
+        QMessageBox.information(self, "Зоя", f"Сохранено {saved} файлов")
+
+
+# =====================================================
+# ЗАПУСК ПРОГРАММЫ
+# =====================================================
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    
+    # Стиль и название
+    app.setApplicationName("Зоя")
+    app.setApplicationVersion("8.0")
+    app.setOrganizationName("Zoya Project")
+    app.setStyle('Fusion')
+    
+    # Главное окно
+    window = MainWindow()
+    window.show()
+    
+    print("="*80)
+    print("ЗОЯ CANON ENGINE 8.0 УСПЕШНО ЗАПУЩЕНА")
+    print("Полная интеграция твоих канонов + Ksenia интерфейс")
+    print("")
+    print("Горячие клавиши:")
+    print("   Ctrl+N        → Новый плейлист")
+    print("   Ctrl+O        → Открыть M3U")
+    print("   Ctrl+S        → Сохранить")
+    print("   Ctrl+Shift+Z  → Применить все каноны Зоя")
+    print("="*80)
+    
+    sys.exit(app.exec())
