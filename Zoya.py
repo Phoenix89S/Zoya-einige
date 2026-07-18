@@ -744,3 +744,564 @@ class PlaylistTab(QWidget):
         self._refresh_table()
         self.modified = True
         QMessageBox.information(self, "Зоя", f"Применено к {len(self.all_channels)} каналам")
+
+# =========================
+# MainWindow — основное окно Зоя
+# =========================
+
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Зоя — M3U Editor + Canon Engine 8.0")
+        self.resize(1750, 1000)
+
+        self.tabs = {}
+        self.current_tab = None
+        self.zoya_engine = ZoyaCanonEngine8()
+
+        self._setup_ui()
+        self._setup_menu()
+        self._setup_toolbar()
+        self._new_file()
+
+    def _setup_ui(self):
+        central = QWidget()
+        self.setCentralWidget(central)
+        layout = QVBoxLayout(central)
+
+        self.tab_widget = QTabWidget()
+        self.tab_widget.setTabsClosable(True)
+        self.tab_widget.tabCloseRequested.connect(self._close_tab)
+        self.tab_widget.currentChanged.connect(self._on_tab_changed)
+        layout.addWidget(self.tab_widget)
+
+    def _setup_menu(self):
+        mb = self.menuBar()
+
+        file_menu = mb.addMenu("Файл")
+        file_menu.addAction("Новый", self._new_file, "Ctrl+N")
+        file_menu.addAction("Открыть", self._open_file, "Ctrl+O")
+        file_menu.addAction("Сохранить", self._save_file, "Ctrl+S")
+
+        zoya_menu = mb.addMenu("Зоя")
+        apply_action = QAction("Применить Canon Engine 8.0", self)
+        apply_action.setShortcut("Ctrl+Shift+Z")
+        apply_action.triggered.connect(self._apply_zoya_canons)
+        zoya_menu.addAction(apply_action)
+
+    def _setup_toolbar(self):
+        tb = QToolBar()
+        self.addToolBar(tb)
+        tb.addAction("Зоя Каноны", self._apply_zoya_canons)
+
+    def _new_file(self):
+        tab = PlaylistTab()
+        tab.zoya_engine = self.zoya_engine
+        index = self.tab_widget.addTab(tab, "Новый плейлист")
+        self.tabs[tab] = tab
+        self.tab_widget.setCurrentIndex(index)
+        self.current_tab = tab
+
+    def _open_file(self):
+        filepath, _ = QFileDialog.getOpenFileName(self, "Открыть M3U", "", "M3U (*.m3u *.m3u8)")
+        if filepath:
+            tab = PlaylistTab()
+            tab.zoya_engine = self.zoya_engine
+            tab.load_file(filepath)
+            index = self.tab_widget.addTab(tab, os.path.basename(filepath))
+            self.tabs[tab] = tab
+            self.tab_widget.setCurrentIndex(index)
+            self.current_tab = tab
+
+    def _save_file(self):
+        if self.current_tab:
+            if not self.current_tab.filepath:
+                filepath, _ = QFileDialog.getSaveFileName(self, "Сохранить как", "", "M3U (*.m3u)")
+                if filepath:
+                    self.current_tab.filepath = filepath
+            if self.current_tab.filepath:
+                self.current_tab.save_to_file()
+
+    def _apply_zoya_canons(self):
+        if self.current_tab:
+            self.current_tab.apply_zoya_canons()
+
+    def _close_tab(self, index):
+        widget = self.tab_widget.widget(index)
+        if widget in self.tabs:
+            del self.tabs[widget]
+        self.tab_widget.removeTab(index)
+
+    def _on_tab_changed(self, index):
+        if index >= 0:
+            self.current_tab = self.tab_widget.widget(index)
+        else:
+            self.current_tab = None
+
+
+# =========================
+# PlaylistTab (расширенная)
+# =========================
+
+class PlaylistTab(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.filepath = None
+        self.all_channels: List[ChannelData] = []
+        self.zoya_engine = None
+        self.modified = False
+        self._setup_ui()
+
+    def _setup_ui(self):
+        layout = QVBoxLayout(self)
+        self.table = QTableWidget()
+        self.table.setColumnCount(6)
+        self.table.setHorizontalHeaderLabels(["Имя", "Группа", "Z-Code", "Q-Code", "URL", "Статус"])
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        layout.addWidget(self.table)
+
+        btn_layout = QHBoxLayout()
+        zoya_btn = QPushButton("🚀 Применить Zoya Canon Engine 8.0")
+        zoya_btn.clicked.connect(self.apply_zoya_canons)
+        btn_layout.addWidget(zoya_btn)
+        layout.addLayout(btn_layout)
+
+    def load_file(self, filepath):
+        self.filepath = filepath
+        try:
+            with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
+                content = f.read()
+            self._parse_m3u(content)
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось открыть файл:\n{str(e)}")
+
+    def _parse_m3u(self, content: str):
+        self.all_channels.clear()
+        lines = content.splitlines()
+        i = 0
+        while i < len(lines):
+            line = lines[i].strip()
+            if line.startswith("#EXTINF:"):
+                ch = ChannelData()
+                ch.extinf = line
+                if ',' in line:
+                    ch.name = line.split(',', 1)[1].strip()
+                i += 1
+                if i < len(lines) and not lines[i].startswith("#"):
+                    ch.url = lines[i].strip()
+                self.all_channels.append(ch)
+            i += 1
+        self._refresh_table()
+
+    def _refresh_table(self):
+        self.table.setRowCount(len(self.all_channels))
+        for row, ch in enumerate(self.all_channels):
+            self.table.setItem(row, 0, QTableWidgetItem(ch.name))
+            self.table.setItem(row, 1, QTableWidgetItem(ch.group or "Без группы"))
+            self.table.setItem(row, 2, QTableWidgetItem(ch.z_code or ""))
+            self.table.setItem(row, 3, QTableWidgetItem(ch.q_code or ""))
+            self.table.setItem(row, 4, QTableWidgetItem(ch.url[:80] + "..." if len(ch.url) > 80 else ch.url))
+            self.table.setItem(row, 5, QTableWidgetItem("✓" if ch.url else "✗"))
+
+    def apply_zoya_canons(self):
+        if not self.zoya_engine or not self.all_channels:
+            QMessageBox.warning(self, "Ошибка", "Нет данных для обработки")
+            return
+        count = len(self.all_channels)
+        for ch in self.all_channels:
+            self.zoya_engine.process_channel(ch)
+        self._refresh_table()
+        self.modified = True
+        QMessageBox.information(self, "Успех", f"Canon Engine 8.0 применён к {count} каналам!")
+
+    def save_to_file(self):
+        if not self.filepath:
+            self.filepath, _ = QFileDialog.getSaveFileName(self, "Сохранить как", "", "M3U (*.m3u *.m3u8)")
+        if self.filepath:
+            try:
+                with open(self.filepath, 'w', encoding='utf-8') as f:
+                    f.write("#EXTM3U\n\n")
+                    for ch in self.all_channels:
+                        f.write(ch.extinf + "\n")
+                        if ch.url:
+                            f.write(ch.url + "\n")
+                self.modified = False
+                return True
+            except Exception as e:
+                QMessageBox.critical(self, "Ошибка", str(e))
+        return False
+
+# =========================
+# MainWindow — полная версия
+# =========================
+
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Зоя — M3U Editor + Canon Engine 8.0")
+        self.resize(1800, 1050)
+
+        self.tabs = {}
+        self.current_tab = None
+        self.zoya_engine = ZoyaCanonEngine8()
+
+        self._setup_ui()
+        self._setup_menu()
+        self._setup_toolbar()
+        self._new_file()  # открываем первую вкладку
+
+    def _setup_ui(self):
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        main_layout = QVBoxLayout(central_widget)
+
+        self.tab_widget = QTabWidget()
+        self.tab_widget.setTabsClosable(True)
+        self.tab_widget.tabCloseRequested.connect(self._close_tab)
+        self.tab_widget.currentChanged.connect(self._on_tab_changed)
+        main_layout.addWidget(self.tab_widget)
+
+    def _setup_menu(self):
+        menu_bar = self.menuBar()
+
+        file_menu = menu_bar.addMenu("Файл")
+        file_menu.addAction("Новый плейлист", self._new_file, "Ctrl+N")
+        file_menu.addAction("Открыть", self._open_file, "Ctrl+O")
+        file_menu.addAction("Сохранить", self._save_file, "Ctrl+S")
+        file_menu.addAction("Сохранить как", self._save_as, "Ctrl+Shift+S")
+
+        zoya_menu = menu_bar.addMenu("Зоя")
+        canon_action = QAction("Применить Canon Engine 8.0", self)
+        canon_action.setShortcut("Ctrl+Shift+Z")
+        canon_action.triggered.connect(self._apply_zoya_canons)
+        zoya_menu.addAction(canon_action)
+
+        zoya_menu.addSeparator()
+        zoya_menu.addAction("О программе", self._about)
+
+    def _setup_toolbar(self):
+        toolbar = QToolBar("Основная панель")
+        self.addToolBar(toolbar)
+
+        toolbar.addAction("Новый", self._new_file)
+        toolbar.addAction("Открыть", self._open_file)
+        toolbar.addAction("Сохранить", self._save_file)
+        toolbar.addSeparator()
+        zoya_action = QAction("🚀 Zoya Canon 8.0", self)
+        zoya_action.triggered.connect(self._apply_zoya_canons)
+        toolbar.addAction(zoya_action)
+
+    def _new_file(self):
+        tab = PlaylistTab()
+        tab.zoya_engine = self.zoya_engine
+        index = self.tab_widget.addTab(tab, "Новый плейлист")
+        self.tabs[tab] = tab
+        self.tab_widget.setCurrentIndex(index)
+        self.current_tab = tab
+
+    def _open_file(self):
+        filepath, _ = QFileDialog.getOpenFileName(self, "Открыть M3U", "", "M3U файлы (*.m3u *.m3u8)")
+        if filepath:
+            tab = PlaylistTab()
+            tab.zoya_engine = self.zoya_engine
+            tab.load_file(filepath)
+            index = self.tab_widget.addTab(tab, os.path.basename(filepath))
+            self.tabs[tab] = tab
+            self.tab_widget.setCurrentIndex(index)
+            self.current_tab = tab
+
+    def _save_file(self):
+        if self.current_tab:
+            self.current_tab.save_to_file()
+
+    def _save_as(self):
+        if self.current_tab:
+            filepath, _ = QFileDialog.getSaveFileName(self, "Сохранить как", "", "M3U (*.m3u)")
+            if filepath:
+                self.current_tab.filepath = filepath
+                self.current_tab.save_to_file()
+
+    def _apply_zoya_canons(self):
+        if self.current_tab:
+            self.current_tab.apply_zoya_canons()
+
+    def _about(self):
+        QMessageBox.about(self, "Зоя", 
+            "Зоя Canon Engine 8.0\n"
+            "Основано на Ksenia + твоих наработках\n"
+            "Все каноны работают.")
+
+    def _close_tab(self, index):
+        widget = self.tab_widget.widget(index)
+        if widget in self.tabs:
+            del self.tabs[widget]
+        self.tab_widget.removeTab(index)
+
+    def _on_tab_changed(self, index):
+        if index >= 0:
+            self.current_tab = self.tab_widget.widget(index)
+        else:
+            self.current_tab = None
+
+
+# =========================
+# Запуск приложения
+# =========================
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    app.setApplicationName("Зоя")
+    app.setStyle('Fusion')
+
+    window = MainWindow()
+    window.show()
+
+    print("✅ Зоя запущена. Ctrl+Shift+Z — применить каноны.")
+    sys.exit(app.exec())
+
+# =========================
+# Дополнительные Ksenia классы (полностью)
+# =========================
+
+class SystemThemeManager:
+    @staticmethod
+    def get_config_dir() -> str:
+        return os.path.expanduser("\~/.zoya")
+
+
+class LinkSourceManager:
+    def __init__(self):
+        self.sources = []
+
+    def get_enabled_sources(self):
+        return self.sources
+
+
+# =========================
+# Финальные методы PlaylistTab
+# =========================
+
+class PlaylistTab(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.filepath = None
+        self.all_channels: List[ChannelData] = []
+        self.zoya_engine = None
+        self.modified = False
+        self._setup_ui()
+
+    def _setup_ui(self):
+        layout = QVBoxLayout(self)
+        
+        self.table = QTableWidget()
+        self.table.setColumnCount(6)
+        self.table.setHorizontalHeaderLabels(["Имя", "Группа", "Z-Code", "Q-Code", "URL", "Статус"])
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        layout.addWidget(self.table)
+
+        btn_layout = QHBoxLayout()
+        
+        zoya_btn = QPushButton("🚀 Применить Zoya Canon Engine 8.0")
+        zoya_btn.clicked.connect(self.apply_zoya_canons)
+        btn_layout.addWidget(zoya_btn)
+        
+        save_btn = QPushButton("Сохранить")
+        save_btn.clicked.connect(self.save_to_file)
+        btn_layout.addWidget(save_btn)
+        
+        layout.addLayout(btn_layout)
+
+    def load_file(self, filepath):
+        self.filepath = filepath
+        try:
+            with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
+                content = f.read()
+            self._parse_m3u(content)
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось открыть файл:\n{str(e)}")
+
+    def _parse_m3u(self, content: str):
+        self.all_channels.clear()
+        lines = content.splitlines()
+        i = 0
+        while i < len(lines):
+            line = lines[i].strip()
+            if line.startswith("#EXTINF:"):
+                ch = ChannelData()
+                ch.extinf = line
+                if ',' in line:
+                    ch.name = line.split(',', 1)[1].strip()
+                i += 1
+                if i < len(lines) and not lines[i].startswith("#"):
+                    ch.url = lines[i].strip()
+                self.all_channels.append(ch)
+            i += 1
+        self._refresh_table()
+
+    def _refresh_table(self):
+        self.table.setRowCount(len(self.all_channels))
+        for row, ch in enumerate(self.all_channels):
+            self.table.setItem(row, 0, QTableWidgetItem(ch.name))
+            self.table.setItem(row, 1, QTableWidgetItem(ch.group or "Без группы"))
+            self.table.setItem(row, 2, QTableWidgetItem(ch.z_code or ""))
+            self.table.setItem(row, 3, QTableWidgetItem(ch.q_code or ""))
+            url_text = ch.url[:80] + "..." if len(ch.url) > 80 else ch.url
+            self.table.setItem(row, 4, QTableWidgetItem(url_text))
+            self.table.setItem(row, 5, QTableWidgetItem("✓" if ch.url else "✗"))
+
+    def apply_zoya_canons(self):
+        if not self.zoya_engine or not self.all_channels:
+            QMessageBox.warning(self, "Ошибка", "Нет данных для обработки")
+            return
+        
+        count = len(self.all_channels)
+        for ch in self.all_channels:
+            self.zoya_engine.process_channel(ch)
+        
+        self._refresh_table()
+        self.modified = True
+        QMessageBox.information(self, "Зоя Canon Engine 8.0", 
+                              f"Успешно обработано {count} каналов!\n"
+                              "Добавлены: ★★★, Z-коды, Q-коды, группы Zoya.")
+
+    def save_to_file(self):
+        if not self.filepath:
+            self.filepath, _ = QFileDialog.getSaveFileName(self, "Сохранить как", "", "M3U (*.m3u *.m3u8)")
+        
+        if self.filepath:
+            try:
+                with open(self.filepath, 'w', encoding='utf-8') as f:
+                    f.write("#EXTM3U\n\n")
+                    for ch in self.all_channels:
+                        f.write(ch.extinf + "\n")
+                        if ch.url:
+                            f.write(ch.url + "\n")
+                self.modified = False
+                QMessageBox.information(self, "Сохранено", f"Файл сохранён:\n{self.filepath}")
+                return True
+            except Exception as e:
+                QMessageBox.critical(self, "Ошибка", str(e))
+        return False
+
+# =========================
+# Финальные Ksenia классы и диалоги
+# =========================
+
+class DomainUserAgentDialog(QDialog):
+    def __init__(self, manager, parent=None):
+        super().__init__(parent)
+        self.manager = manager
+        self.setWindowTitle("User-Agent по доменам (Зоя)")
+        self.resize(800, 500)
+        layout = QVBoxLayout(self)
+        label = QLabel("Функция User-Agent по доменам")
+        layout.addWidget(label)
+        btn = QPushButton("Закрыть")
+        btn.clicked.connect(self.accept)
+        layout.addWidget(btn)
+
+
+# =========================
+# Полный MainWindow (финал)
+# =========================
+
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Зоя — M3U Editor + Canon Engine 8.0")
+        self.resize(1800, 1050)
+
+        self.tabs = {}
+        self.current_tab = None
+        self.zoya_engine = ZoyaCanonEngine8()
+
+        self._setup_ui()
+        self._setup_menu()
+        self._setup_toolbar()
+        self._new_file()
+
+    def _setup_ui(self):
+        central = QWidget()
+        self.setCentralWidget(central)
+        layout = QVBoxLayout(central)
+        self.tab_widget = QTabWidget()
+        self.tab_widget.setTabsClosable(True)
+        self.tab_widget.tabCloseRequested.connect(self._close_tab)
+        self.tab_widget.currentChanged.connect(self._on_tab_changed)
+        layout.addWidget(self.tab_widget)
+
+    def _setup_menu(self):
+        mb = self.menuBar()
+        file = mb.addMenu("Файл")
+        file.addAction("Новый", self._new_file, "Ctrl+N")
+        file.addAction("Открыть", self._open_file, "Ctrl+O")
+        file.addAction("Сохранить", self._save_file, "Ctrl+S")
+
+        zoya = mb.addMenu("Зоя")
+        zoya.addAction("Применить Canon Engine 8.0", self._apply_zoya_canons, "Ctrl+Shift+Z")
+
+    def _setup_toolbar(self):
+        tb = QToolBar()
+        self.addToolBar(tb)
+        tb.addAction("Zoya Canon 8.0", self._apply_zoya_canons)
+
+    def _new_file(self):
+        tab = PlaylistTab()
+        tab.zoya_engine = self.zoya_engine
+        idx = self.tab_widget.addTab(tab, "Новый")
+        self.tabs[tab] = tab
+        self.tab_widget.setCurrentIndex(idx)
+        self.current_tab = tab
+
+    def _open_file(self):
+        path, _ = QFileDialog.getOpenFileName(self, "Открыть", "", "M3U (*.m3u *.m3u8)")
+        if path:
+            tab = PlaylistTab()
+            tab.zoya_engine = self.zoya_engine
+            tab.load_file(path)
+            idx = self.tab_widget.addTab(tab, os.path.basename(path))
+            self.tabs[tab] = tab
+            self.tab_widget.setCurrentIndex(idx)
+            self.current_tab = tab
+
+    def _save_file(self):
+        if self.current_tab:
+            self.current_tab.save_to_file()
+
+    def _apply_zoya_canons(self):
+        if self.current_tab:
+            self.current_tab.apply_zoya_canons()
+
+    def _close_tab(self, index):
+        w = self.tab_widget.widget(index)
+        if w in self.tabs:
+            del self.tabs[w]
+        self.tab_widget.removeTab(index)
+
+    def _on_tab_changed(self, index):
+        if index >= 0:
+            self.current_tab = self.tab_widget.widget(index)
+        else:
+            self.current_tab = None
+
+
+# =========================
+# ЗАПУСК
+# =========================
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    app.setApplicationName("Зоя")
+    app.setStyle('Fusion')
+
+    window = MainWindow()
+    window.show()
+
+    print("="*60)
+    print("Зоя Canon Engine 8.0 запущена!")
+    print("Ctrl+Shift+Z — применить все каноны")
+    print("="*60)
+
+    sys.exit(app.exec())
