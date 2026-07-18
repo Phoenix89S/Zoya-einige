@@ -879,3 +879,121 @@ class PlaylistTab(QWidget):
                 QMessageBox.critical(self, "Ошибка", str(e))
         return False
 
+# =========================
+# MainWindow — Полная версия
+# =========================
+
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Зоя — M3U Editor + Canon Engine 8.0")
+        self.resize(1850, 1100)
+
+        self.tabs = {}
+        self.current_tab = None
+        self.zoya_engine = ZoyaCanonEngine8()
+
+        self.domain_ua_manager = DomainUserAgentManager()
+        self.blacklist_manager = BlacklistManager()
+
+        self._setup_ui()
+        self._setup_menu()
+        self._setup_toolbar()
+        self._new_file()
+
+    def _setup_ui(self):
+        central = QWidget()
+        self.setCentralWidget(central)
+        layout = QVBoxLayout(central)
+
+        self.tab_widget = QTabWidget()
+        self.tab_widget.setTabsClosable(True)
+        self.tab_widget.tabCloseRequested.connect(self._close_tab)
+        self.tab_widget.currentChanged.connect(self._on_tab_changed)
+        layout.addWidget(self.tab_widget)
+
+    def _setup_menu(self):
+        mb = self.menuBar()
+
+        file_menu = mb.addMenu("Файл")
+        file_menu.addAction("Новый", self._new_file, "Ctrl+N")
+        file_menu.addAction("Открыть", self._open_file, "Ctrl+O")
+        file_menu.addAction("Сохранить", self._save_file, "Ctrl+S")
+        file_menu.addAction("Сохранить как", self._save_as, "Ctrl+Shift+S")
+
+        zoya_menu = mb.addMenu("Зоя")
+        zoya_menu.addAction("Применить Canon Engine 8.0", self._apply_zoya_canons, "Ctrl+Shift+Z")
+        zoya_menu.addAction("User-Agent по доменам", self._manage_ua)
+
+    def _setup_toolbar(self):
+        tb = QToolBar()
+        self.addToolBar(tb)
+        tb.addAction("Новый", self._new_file)
+        tb.addAction("Открыть", self._open_file)
+        tb.addAction("Сохранить", self._save_file)
+        tb.addSeparator()
+        tb.addAction("Zoya Canon 8.0", self._apply_zoya_canons)
+
+    def _new_file(self):
+        tab = PlaylistTab()
+        tab.zoya_engine = self.zoya_engine
+        index = self.tab_widget.addTab(tab, "Новый плейлист")
+        self.tabs[tab] = tab
+        self.tab_widget.setCurrentIndex(index)
+        self.current_tab = tab
+
+    def _open_file(self):
+        filepath, _ = QFileDialog.getOpenFileName(self, "Открыть M3U", "", "M3U (*.m3u *.m3u8)")
+        if filepath:
+            tab = PlaylistTab()
+            tab.zoya_engine = self.zoya_engine
+            tab.load_file(filepath)
+            index = self.tab_widget.addTab(tab, os.path.basename(filepath))
+            self.tabs[tab] = tab
+            self.tab_widget.setCurrentIndex(index)
+            self.current_tab = tab
+
+    def _save_file(self):
+        if self.current_tab:
+            self.current_tab.save_to_file()
+
+    def _save_as(self):
+        if self.current_tab:
+            filepath, _ = QFileDialog.getSaveFileName(self, "Сохранить как", "", "M3U (*.m3u)")
+            if filepath:
+                self.current_tab.filepath = filepath
+                self.current_tab.save_to_file()
+
+    def _apply_zoya_canons(self):
+        if self.current_tab:
+            self.current_tab.apply_zoya_canons()
+
+    def _manage_ua(self):
+        dialog = DomainUserAgentDialog(self.domain_ua_manager, self)
+        dialog.exec()
+
+    def _close_tab(self, index):
+        widget = self.tab_widget.widget(index)
+        if widget in self.tabs:
+            del self.tabs[widget]
+        self.tab_widget.removeTab(index)
+
+    def _on_tab_changed(self, index):
+        if index >= 0:
+            self.current_tab = self.tab_widget.widget(index)
+        else:
+            self.current_tab = None
+
+
+# =========================
+# BlacklistManager (простая версия)
+# =========================
+
+class BlacklistManager:
+    def __init__(self):
+        self.blacklist = []
+
+    def add_channel(self, name, tvg_id):
+        self.blacklist.append({"name": name, "tvg_id": tvg_id})
+
+
