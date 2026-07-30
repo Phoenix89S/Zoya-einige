@@ -182,3 +182,46 @@ https://autopilot.catcast.tv/content/38788/index.m3u8
 https://autopilot.catcast.tv/content/38789/index.m3u8
 #EXTINF:-1, Заглушка BF
 https://autopilot.catcast.tv/content/38790/index.m3u8
+
+
+
+#EXTINF:-1 ,Cinema
+http://194.152.35.17/cinema/index.m3u8
+#EXTINF:-1 ,Cinema
+http://iptv.mega.net.ru:8888/Cinema/index.m3u8
+#EXTINF:-1 ,Cinema
+http://176.118.197.101/Cinema/index.m3u8
+#EXTINF:-1 ,Cinema
+https://stream8.cinerama.uz/1227/tracks-v1a1/mono.m3u8
+#EXTINF:-1 ,Cinema
+https://cdn4.skygo.mn/live/disk1/CinemaTV/HLSv3-FTA/CinemaTV.m3u8
+#EXTINF:-1 ,Cineman Cartoons Big
+http://ott.watch/stream/6HAPZWKKG3/348.m3u8
+#EXTINF:-1 ,Cineman HD AM
+http://185.57.68.33:80/255/playlist.m3u8
+#EXTINF:-1 ,CineMan Marvel HD
+http://ott.watch/stream/D17LBTRCERA/354.m3u8
+#EXTINF:-1 ,Cineman VHS HD
+http://ott.watch/stream/D17LBTRCERA/474.m3u8
+#EXTINF:-1 ,Cinemax
+http://88.212.7.11/live/test_cinemax_hd_hevc/playlist.m3u8
+#EXTINF:-1 ,Cinemax
+http://gg.gg/HaNoiIPTV-Cinemax_HD
+#EXTINF:-1 ,CINEMAX
+https://cdnjkt913.transvision.co.id:1000/live/master/1/4028c6856c3db2cc016cdbfc4a1934bf/manifest.mpd
+#EXTINF:-1 ,Cinemax 2
+http://88.212.7.11/live/test_cinemax2_hd_hevc/playlist.m3u8
+#EXTINF:-1 ,Classic Music
+http://stream.mcquack.net/312/index.m3u8
+#EXTINF:-1 ,CNN CA
+http://s8.rafail1982.uz/1259/tracks-v1a1a1/mono.m3u8
+#EXTINF:-1 ,Comedy Central
+https://adpnetworkhd-cmd.github.io/iptv/ComedyCentralSpain.m3u8
+#EXTINF:-1 ,Comedy Central
+http://23.237.104.106:8080/USA_COMEDY_CENTRAL/index.m3u8
+#EXTINF:-1 ,Comedy Central
+http://141.95.55.143/CH295/index.m3u8
+#EXTINF:-1 ,Crime + Investigation
+http://23.237.104.106:8080/USA_CRIME_INVESTIGATION/index.m3u8
+#EXTINF:-1 ,CTV.BY HD
+http://ctv.dc.beltelecom.by/ctv/ctv.stream/playlist.m3u8
